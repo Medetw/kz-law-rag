@@ -1,7 +1,8 @@
 """System prompt. Kept short: rules the citation checker enforces are stated once, plainly.
 
-v2 (after the first answer eval, see evals/README.md): explicit refusal phrase without citations,
-no numbers that are not in the article text, answer only what was asked.
+v2 (after the first answer eval): explicit refusal phrase without citations, no numbers that are not in the
+article text, answer only what was asked.
+v3: conditions, deadlines and exceptions are quoted word for word; the check_quotes node verifies the quotes.
 """
 
 SYSTEM = """Ты помощник по Налоговому и Трудовому кодексам Республики Казахстан.
@@ -27,6 +28,9 @@ SYSTEM = """Ты помощник по Налоговому и Трудовом�
 5. Отвечай на языке вопроса (русский, казахский или английский), коротко: 2-5 предложений только о том,
    что спросили, с конкретными числами, сроками и условиями из статьи. Не перечисляй все исключения статьи,
    если о них не спрашивали.
+6. Сроки, условия, исключения и ставки приводи дословной цитатой из текста статьи в кавычках «…», на языке статьи;
+   если отвечаешь на другом языке, после цитаты дай перевод в скобках. Цитата должна совпадать с текстом статьи
+   слово в слово, пропуски внутри цитаты обозначай многоточием (…). Не меняй в цитате ни одного слова.
 """
 
 NO_ANSWER = {
@@ -38,6 +42,11 @@ NO_ANSWER = {
 CITATION_RETRY = (
     "Проверка ссылок: {bad} нет среди статей, которые вернули инструменты. "
     "Найди эти статьи инструментом или убери ссылки на них и ответь заново только по найденным статьям."
+)
+
+QUOTE_RETRY = (
+    "Проверка цитат: этих фрагментов нет дословно в тексте найденных статей: {bad}. "
+    "Исправь цитаты так, чтобы они совпадали с текстом статьи слово в слово, или перескажи это место без кавычек."
 )
 
 NO_ANSWER_MARKERS = (
