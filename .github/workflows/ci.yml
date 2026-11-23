@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: kzlaw
+          POSTGRES_PASSWORD: kzlaw
+          POSTGRES_DB: kzlaw_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U kzlaw -d kzlaw_test"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgresql://kzlaw:kzlaw@localhost:5432/kzlaw_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      # no torch / models in CI: tests use a hashing embedder and a scripted chat model
+      - run: uv sync --frozen --no-default-groups --group dev
+      - name: Lint
+        run: uv run ruff check . && uv run ruff format --check .
+      - name: Types
+        run: uv run mypy
+      - name: Tests (unit + agent graph + API + MCP + pgvector)
+        run: uv run pytest -q
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build API image
+        run: docker build -t kz-law-rag-api .

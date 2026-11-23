@@ -1,0 +1,38 @@
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kzlaw
+      POSTGRES_PASSWORD: kzlaw
+      POSTGRES_DB: kzlaw
+    ports:
+      - "127.0.0.1:${KZLAW_DB_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kzlaw -d kzlaw"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://kzlaw:kzlaw@db:5432/kzlaw
+      HF_HOME: /models
+    ports:
+      - "127.0.0.1:${KZLAW_API_PORT:-8001}:8000"
+    volumes:
+      - ./data:/app/data
+      - models:/models
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  models:

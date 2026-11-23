@@ -1,0 +1,48 @@
+{"id": "q01", "lang": "ru", "type": "fact", "question": "Какая основная ставка НДС в Казахстане в 2026 году?", "expected": [["tax2026:503"]], "facts": ["16"]}
+{"id": "q02", "lang": "ru", "type": "fact", "question": "По какой ставке НДС облагаются лекарства в 2026 году?", "expected": [["tax2026:503"]], "facts": ["\\b5\\b"]}
+{"id": "q03", "lang": "ru", "type": "fact", "question": "При каком годовом обороте компания или ИП обязаны встать на учет по НДС?", "expected": [["tax2026:99", "tax2026:101"]], "facts": ["10\\s?000"]}
+{"id": "q04", "lang": "ru", "type": "fact", "question": "Какая ставка корпоративного подоходного налога?", "expected": [["tax2026:357"]], "facts": ["20"]}
+{"id": "q05", "lang": "ru", "type": "fact", "question": "Какие ставки индивидуального подоходного налога действуют с 2026 года?", "expected": [["tax2026:363"]], "facts": ["10"]}
+{"id": "q06", "lang": "ru", "type": "fact", "question": "Какая ставка социального налога?", "expected": [["tax2026:557"]], "facts": ["\\b6\\b"]}
+{"id": "q07", "lang": "ru", "type": "fact", "question": "Какой налоговый период по НДС?", "expected": [["tax2026:504"]], "facts": ["квартал"]}
+{"id": "q08", "lang": "ru", "type": "fact", "question": "Сколько лет налоговая может доначислить налоги (срок исковой давности) для обычной компании?", "expected": [["tax2026:65"]], "facts": ["три года|3 года|3 лет|трех лет"]}
+{"id": "q09", "lang": "ru", "type": "fact", "question": "По какой ставке НДС облагается экспорт товаров?", "expected": [["tax2026:467"]], "facts": ["нулев|\\b0\\s?%|0 процент"]}
+{"id": "q10", "lang": "ru", "type": "fact", "question": "Какая ставка налога при упрощенной декларации?", "expected": [["tax2026:726", "tax2026:715"]], "facts": ["\\b4\\b"]}
+{"id": "q11", "lang": "ru", "type": "fact", "question": "Какой предельный годовой доход для применения упрощенной декларации?", "expected": [["tax2026:723", "tax2026:715"]], "facts": ["600\\s?000"]}
+{"id": "q12", "lang": "ru", "type": "fact", "question": "Какие специальные налоговые режимы может выбрать ИП в 2026 году?", "expected": [["tax2026:715"]], "facts": ["самозанят"]}
+{"id": "q13", "lang": "ru", "type": "fact", "question": "Какой индивидуальный подоходный налог платит самозанятый?", "expected": [["tax2026:720", "tax2026:715"]], "facts": ["\\b0\\s?(%|процент)"]}
+{"id": "q14", "lang": "ru", "type": "fact", "question": "Как начисляется пеня за несвоевременную уплату налога?", "expected": [["tax2026:85"]], "facts": []}
+{"id": "q15", "lang": "ru", "type": "fact", "question": "Какие обороты по реализации освобождаются от НДС?", "expected": [["tax2026:474"]], "facts": []}
+{"id": "q16", "lang": "ru", "type": "date", "as_of": "2025-06-01", "question": "Какая ставка НДС действовала в 2025 году?", "expected": [["tax2017:422"]], "facts": ["12"]}
+{"id": "q17", "lang": "ru", "type": "date", "as_of": "2025-06-01", "question": "Какой был порог обязательной постановки на учет по НДС в 2025 году?", "expected": [["tax2017:82"]], "facts": ["20\\s?000"]}
+{"id": "q18", "lang": "ru", "type": "date", "as_of": "2025-06-01", "question": "Какая была ставка КПН в 2025 году?", "expected": [["tax2017:313"]], "facts": ["20"]}
+{"id": "q19", "lang": "ru", "type": "change", "question": "Как изменилась ставка НДС в 2026 году по сравнению с 2025 годом?", "expected": [["tax2026:503"], ["tax2017:422"]], "facts": ["12", "16"]}
+{"id": "q20", "lang": "ru", "type": "change", "question": "Как изменился порог обязательной регистрации по НДС в новом Налоговом кодексе?", "expected": [["tax2026:99", "tax2026:101"], ["tax2017:82"]], "facts": ["20\\s?000", "10\\s?000"]}
+{"id": "q21", "lang": "ru", "type": "fact", "question": "Сколько дней длится основной ежегодный оплачиваемый отпуск?", "expected": [["labor:88"]], "facts": ["24|двадцать четыре"]}
+{"id": "q22", "lang": "ru", "type": "fact", "question": "Какой максимальный испытательный срок при приеме на работу?", "expected": [["labor:36"]], "facts": ["три месяц|3 месяц|тр[её]х месяц|3-х месяц"]}
+{"id": "q23", "lang": "ru", "type": "fact", "question": "За сколько нужно предупредить работодателя, если хочешь уволиться по собственному желанию?", "expected": [["labor:56"]], "facts": ["месяц"]}
+{"id": "q24", "lang": "ru", "type": "fact", "question": "Какая нормальная продолжительность рабочей недели?", "expected": [["labor:68"]], "facts": ["40"]}
+{"id": "q25", "lang": "ru", "type": "fact", "question": "Сколько часов сверхурочной работы допускается в сутки и в месяц?", "expected": [["labor:78"]], "facts": ["два час|2 час|двух час", "двенадцат|12"]}
+{"id": "q26", "lang": "ru", "type": "fact", "question": "Как оплачивается сверхурочная работа?", "expected": [["labor:108"]], "facts": ["полутор|1,5"]}
+{"id": "q27", "lang": "ru", "type": "fact", "question": "Какое время по закону считается ночным?", "expected": [["labor:76"]], "facts": ["22"]}
+{"id": "q28", "lang": "ru", "type": "fact", "question": "Сколько длится декрет при нормальных родах?", "expected": [["labor:99"]], "facts": ["семьдесят|70", "пятьдесят шест|56"]}
+{"id": "q29", "lang": "ru", "type": "fact", "question": "Как часто и в какие сроки должна выплачиваться зарплата?", "expected": [["labor:113"]], "facts": ["месяц", "декад"]}
+{"id": "q30", "lang": "ru", "type": "fact", "question": "Какие дисциплинарные взыскания может применить работодатель?", "expected": [["labor:64"]], "facts": ["выговор"]}
+{"id": "q31", "lang": "ru", "type": "fact", "question": "Положена ли компенсация за неиспользованный отпуск при увольнении?", "expected": [["labor:96"]], "facts": ["компенсац"]}
+{"id": "q32", "lang": "ru", "type": "fact", "question": "Как оформляется дистанционная работа?", "expected": [["labor:138"]], "facts": ["договор"]}
+{"id": "q33", "lang": "kz", "type": "fact", "question": "2026 жылы ҚҚС-тың негізгі мөлшерлемесі қандай?", "expected": [["tax2026:503"]], "facts": ["16"]}
+{"id": "q34", "lang": "kz", "type": "fact", "question": "Жыл сайынғы негізгі ақылы еңбек демалысы неше күн?", "expected": [["labor:88"]], "facts": ["24|жиырма төрт"]}
+{"id": "q35", "lang": "kz", "type": "fact", "question": "Жұмысқа қабылдағанда сынақ мерзімі ең көп дегенде қанша болады?", "expected": [["labor:36"]], "facts": ["үш ай|3 ай"]}
+{"id": "q36", "lang": "kz", "type": "fact", "question": "Қалыпты жұмыс уақыты аптасына қанша сағат?", "expected": [["labor:68"]], "facts": ["40"]}
+{"id": "q37", "lang": "kz", "type": "fact", "question": "Корпоративтік табыс салығының мөлшерлемесі қандай?", "expected": [["tax2026:357"]], "facts": ["20"]}
+{"id": "q38", "lang": "kz", "type": "fact", "question": "Әлеуметтік салықтың мөлшерлемесі қандай?", "expected": [["tax2026:557"]], "facts": ["\\b6\\b"]}
+{"id": "q39", "lang": "kz", "type": "fact", "question": "Заң бойынша түнгі уақыт деп қай уақыт саналады?", "expected": [["labor:76"]], "facts": ["22"]}
+{"id": "q40", "lang": "en", "type": "fact", "question": "What is the standard VAT rate in Kazakhstan in 2026?", "expected": [["tax2026:503"]], "facts": ["16"]}
+{"id": "q41", "lang": "en", "type": "fact", "question": "How long can a probation period be for a new employee in Kazakhstan?", "expected": [["labor:36"]], "facts": ["three months|3 months"]}
+{"id": "q42", "lang": "en", "type": "fact", "question": "How many days of paid annual leave does an employee get?", "expected": [["labor:88"]], "facts": ["24|twenty-four|twenty four"]}
+{"id": "q43", "lang": "en", "type": "fact", "question": "What is the corporate income tax rate in Kazakhstan?", "expected": [["tax2026:357"]], "facts": ["20"]}
+{"id": "q44", "lang": "en", "type": "fact", "question": "How much notice must an employee give before resigning?", "expected": [["labor:56"]], "facts": ["month"]}
+{"id": "q45", "lang": "ru", "type": "out_of_scope", "question": "Какой штраф за превышение скорости на 20 км/ч?", "expected": [], "facts": []}
+{"id": "q46", "lang": "ru", "type": "out_of_scope", "question": "Как получить гражданство Республики Казахстан?", "expected": [], "facts": []}
+{"id": "q47", "lang": "en", "type": "out_of_scope", "question": "What is the personal income tax rate in Russia?", "expected": [], "facts": []}
+{"id": "q48", "lang": "ru", "type": "out_of_scope", "question": "Какой срок давности по уголовным делам о краже?", "expected": [], "facts": []}

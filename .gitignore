@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.env
+# downloaded act texts, chunks and vectors are rebuilt locally (see README: Data)
+data/*
+!data/.gitkeep
