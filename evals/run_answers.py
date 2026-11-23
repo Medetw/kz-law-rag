@@ -10,6 +10,8 @@ Metrics (answerable questions unless noted):
 * faithfulness      - LLM judge: every claim is supported by the text of the cited articles
 * refusal accuracy  - out-of-scope questions: "not found" and no citations
 * caught citations  - answers where check_citations removed an article the model never retrieved
+* quote accuracy    - share of «quotes» in final answers that match the article word for word
+                      (quotes still wrong after the retry are shown unquoted and counted as misses)
 """
 
 from __future__ import annotations
@@ -84,6 +86,8 @@ def run_one(settings: Settings, retriever: Retriever, it: Item) -> dict[str, Any
         "answer": res.answer,
         "cited": cited,
         "invalid_removed": res.invalid_citations,
+        "quotes": res.quotes,
+        "invalid_quotes": res.invalid_quotes,
         "tool_calls": res.tool_calls,
         "seconds": round(secs, 1),
         "tokens": res.tokens,
@@ -100,6 +104,12 @@ def run_one(settings: Settings, retriever: Retriever, it: Item) -> dict[str, Any
         said_no = any(m in res.answer.lower() for m in NO_ANSWER_MARKERS)
         row["refused_ok"] = float(said_no and not cited)
     return row
+
+
+def _quote_accuracy(rows: list[dict[str, Any]]) -> float | None:
+    good = sum(len(r["quotes"]) for r in rows)
+    bad = sum(len(r["invalid_quotes"]) for r in rows)
+    return round(good / (good + bad), 3) if good + bad else None
 
 
 def mean(rows: list[dict[str, Any]], key: str) -> float | None:
@@ -132,6 +142,8 @@ def main() -> None:
         ),
         "refusal_accuracy": mean([r for r in ok if r["type"] == "out_of_scope"], "refused_ok"),
         "answers_with_removed_citations": sum(1 for r in ok if r["invalid_removed"]),
+        "answers_with_quotes": sum(1 for r in answerable if r["quotes"] or r["invalid_quotes"]),
+        "quote_accuracy": _quote_accuracy(answerable),
         "by_lang_citation_hit": {
             lang: mean([r for r in answerable if r["lang"] == lang], "citation_hit") for lang in ("ru", "kz", "en")
         },
