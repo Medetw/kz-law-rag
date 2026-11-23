@@ -66,3 +66,10 @@ def test_unquote_keeps_text_but_drops_the_marks() -> None:
     assert quotes.unquote(text, ["в течение семи рабочих дней со дня уведомления"]) == (
         "Срок в течение семи рабочих дней со дня уведомления [labor:56]."
     )
+
+
+def test_spaces_left_by_removed_links_are_forgiven() -> None:
+    source = "за исключением соответствующих подпунктам 1) , 2) и 3) пункта 2 ( далее – организации)"
+    assert (
+        quotes.check("«соответствующих подпунктам 1), 2) и 3) пункта 2 (далее – организации)»", [source]).invalid == []
+    )

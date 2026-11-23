@@ -27,7 +27,9 @@ class QuoteCheck:
 def normalize(text: str) -> str:
     text = text.translate(_DASHES).lower()
     text = re.sub(r"[«»“”\"']", "", text)
-    return re.sub(r"\s+", " ", text).strip(_EDGE_PUNCT)
+    text = re.sub(r"\s+", " ", text)
+    text = re.sub(r" (?=[,.;:)])|(?<=\() ", "", text)  # "1) , 2)" in the source vs "1), 2)" in the quote
+    return text.strip(_EDGE_PUNCT)
 
 
 def extract(answer: str) -> list[str]:

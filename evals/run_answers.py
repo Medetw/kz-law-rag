@@ -10,6 +10,8 @@ Metrics (answerable questions unless noted):
 * faithfulness      - LLM judge: every claim is supported by the text of the cited articles
 * refusal accuracy  - out-of-scope questions: "not found" and no citations
 * caught citations  - answers where check_citations removed an article the model never retrieved
+* language / meta   - the answer is in the question's language (outside quotes and brackets) and does not
+                      talk about the internal checks ("Исправляю...", "Спасибо, замечание...")
 * quote accuracy    - share of «quotes» in final answers that match the article word for word
                       (quotes still wrong after the retry are shown unquoted and counted as misses)
 """
@@ -70,6 +72,20 @@ def judge(settings: Settings, res: AnswerResult) -> dict[str, Any]:
         return {"faithful": None, "unsupported": ["judge: bad JSON"]}
 
 
+_META = re.compile(r"\b(исправляю|спасибо|приношу извинения|замечание верное|проверк[аи] цитат|рахмет|thank you)", re.I)
+_KZ = re.compile(r"[әғқңөұүһі]", re.I)
+
+
+def language_ok(lang: str, answer: str) -> bool:
+    prose = re.sub(r"«[^»]*»|\([^)]*\)|\[[^\]]*\]", " ", answer)  # quotes, translations, citations
+    cyrillic_words = re.findall(r"[а-яёәғқңөұүһі]{4,}", prose, re.I)
+    if lang == "en":
+        return len(cyrillic_words) <= 2
+    if lang == "kz":
+        return bool(_KZ.search(prose))
+    return bool(cyrillic_words)
+
+
 def run_one(settings: Settings, retriever: Retriever, it: Item) -> dict[str, Any]:
     t0 = time.perf_counter()
     try:
@@ -86,6 +102,8 @@ def run_one(settings: Settings, retriever: Retriever, it: Item) -> dict[str, Any
         "answer": res.answer,
         "cited": cited,
         "invalid_removed": res.invalid_citations,
+        "language_ok": float(language_ok(it.lang, res.answer)),
+        "meta_leak": float(bool(_META.search(res.answer))),
         "quotes": res.quotes,
         "invalid_quotes": res.invalid_quotes,
         "tool_calls": res.tool_calls,
@@ -142,6 +160,8 @@ def main() -> None:
         ),
         "refusal_accuracy": mean([r for r in ok if r["type"] == "out_of_scope"], "refused_ok"),
         "answers_with_removed_citations": sum(1 for r in ok if r["invalid_removed"]),
+        "language_ok": mean(ok, "language_ok"),
+        "answers_with_meta_text": sum(1 for r in ok if r["meta_leak"]),
         "answers_with_quotes": sum(1 for r in answerable if r["quotes"] or r["invalid_quotes"]),
         "quote_accuracy": _quote_accuracy(answerable),
         "by_lang_citation_hit": {

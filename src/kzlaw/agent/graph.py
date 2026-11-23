@@ -138,6 +138,11 @@ def make_tools(retriever: Retriever, default_as_of: str) -> list[BaseTool]:
     ]
 
 
+def _question(state: AgentState) -> str:
+    """The user's original question, repeated in retry notes so the rewrite keeps its language."""
+    return str(state["messages"][0].content)
+
+
 def build_graph(llm: BaseChatModel, retriever: Retriever, as_of: str) -> Any:
     tools = make_tools(retriever, as_of)
     by_name = {t.name: t for t in tools}
@@ -174,7 +179,8 @@ def build_graph(llm: BaseChatModel, retriever: Retriever, as_of: str) -> Any:
         cited = citations.extract(text)
         bad = [c for c in cited if c not in state["sources"]]
         if bad and state["retries"] < MAX_CITATION_RETRIES:
-            return {"messages": [HumanMessage(CITATION_RETRY.format(bad=", ".join(bad)))], "retries": 1}
+            note = CITATION_RETRY.format(bad=", ".join(bad), question=_question(state))
+            return {"messages": [HumanMessage(note)], "retries": 1}
         return {
             "answer": citations.strip(text, set(bad)),
             "cited": [c for c in cited if c not in bad],
@@ -188,7 +194,8 @@ def build_graph(llm: BaseChatModel, retriever: Retriever, as_of: str) -> Any:
         res = quotes.check(text, [f"{s.title}\n{s.text}" for s in state["sources"].values()])
         if res.invalid and state["quote_retries"] < MAX_QUOTE_RETRIES:
             bad = "; ".join(f"«{q}»" for q in res.invalid)
-            return {"messages": [HumanMessage(QUOTE_RETRY.format(bad=bad))], "quote_retries": 1, "answer": ""}
+            note = QUOTE_RETRY.format(bad=bad, question=_question(state))
+            return {"messages": [HumanMessage(note)], "quote_retries": 1, "answer": ""}
         return {"answer": quotes.unquote(text, res.invalid), "quotes_ok": res.verified, "quotes_bad": res.invalid}
 
     def after_agent(state: AgentState) -> str:

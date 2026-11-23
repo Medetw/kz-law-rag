@@ -142,6 +142,8 @@ def test_changed_quote_gets_one_retry(settings: Settings, fake_retriever: FakeRe
     retry = llm.seen[-1][-1]
     assert isinstance(retry, HumanMessage)
     assert "равна шестнадцати процентам" in str(retry.content)
+    assert "Ставка НДС?" in str(retry.content)  # the original question is repeated to keep its language
+    assert "не упоминай" in str(retry.content)
     assert res.invalid_quotes == []
     assert len(res.quotes) == 1
 
