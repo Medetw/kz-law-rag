@@ -25,7 +25,7 @@ On 1 January 2026 a new Tax Code came into force: VAT went from 12% to 16%, the 
 
 - **Hybrid search** (BM25 + pgvector, fused with Reciprocal Rank Fusion) over 7,374 chunks of 1,884 articles, with filters by code, language and date.
 - **Date-aware:** a question about 2025 is answered from the old Tax Code, a question about 2026 from the new one; "what changed" compares both.
-- **LangGraph agent** with three tools: `search_law`, `get_article`, `compare_editions`. A citation guard checks that every cited article was actually returned by a tool.
+- **LangGraph agent** with three tools: `search_law`, `get_article`, `compare_editions`. A citation guard checks that every cited article was actually returned by a tool, and a quote guard checks that every «quote» of the law is word for word.
 - **Answers in the language of the question** (Russian, Kazakh, English) and refuses questions outside these codes instead of stretching a nearby article.
 - **MCP server** with the same three tools (stdio and streamable HTTP).
 - **Langfuse tracing:** one trace per question with every LLM call, tool call and the citation check.
@@ -55,9 +55,11 @@ flowchart LR
     G2 --> G1
     G1 -->|final answer| G3[check_citations:<br/>cited ⊆ retrieved]
     G3 -->|unknown article, once| G1
+    G3 --> G4[check_quotes:<br/>«quotes» verbatim]
+    G4 -->|not verbatim, once| G1
   end
   R --> G2
-  G3 --> OUT[Answer + citations<br/>+ links to adilet]
+  G4 --> OUT[Answer + citations<br/>+ links to adilet]
   R --> MCP[MCP server<br/>same 3 tools]
   Agent -. traces .-> LF[Langfuse]
 ```
@@ -88,22 +90,27 @@ What the numbers taught:
 
 The agent on all 48 questions, `deepseek-flash` through the OpenAI-compatible API. Faithfulness is judged by the same model, given only the text of the cited articles; treat it as a strict but not independent check.
 
-| Metric | v1 | **v2** |
-|---|---|---|
-| Answer cites a correct article (44 answerable) | 100% | **100%** (ru, kz, en, by date, "what changed") |
-| Key fact present in the answer | 97.6% | **100%** |
-| Faithfulness (every claim supported by the cited text) | 75.0% | **90.9%** (88.6% in a second run) |
-| Out-of-scope questions refused, with no citations (4) | 0% | **100%** |
-| Citations the guard had to remove | 0 | 0 |
-| Median latency / tool calls per question | 7.4 s / 2.4 | 6.0 s / 2.1 |
-| Tokens per question (in / out), agent only | n/a | 9,500 / 390 |
-| Cost per question, agent only | n/a | **$0.0033** (a 48-question run ≈ $0.16) |
+| Metric | v1 | v2 | **v3** |
+|---|---|---|---|
+| Answer cites a correct article (44 answerable) | 100% | 100% | **100%** (ru, kz, en, by date, "what changed") |
+| Key fact present in the answer | 97.6% | 100% | **100%** |
+| «Quotes» that match the article word for word | n/a | n/a | **100%** (43 answers quote) |
+| Answer in the question's language, no talk about internal checks | n/a | n/a | **100%** |
+| Out-of-scope questions refused, with no citations (4) | 0% | 100% | **100%** |
+| Faithfulness (LLM judge, every claim supported by the cited text) | 75.0% | 90.9%, 88.6% | 84.1% (93.2% in an earlier v3 run) |
+| Citations the guard had to remove | 0 | 0 | 0 |
+| Tokens per question (in / out), agent only | n/a | 9,500 / 390 | 11,300 / 490 |
+| Cost per question, agent only | n/a | $0.0033 | **$0.0040** (a 48-question run ≈ $0.19) |
 
-**v1 → v2** (`agent/prompts.py`): v1 did say "the answer is not in the codes" for out-of-scope questions, then cited the nearest article anyway (tax limitation periods for a question about theft). v2 gives a fixed refusal phrase per language and forbids citations in that case; it also forbids numbers that are not in the article text (v1 added the 2025 MRP value from the model's own memory) and asks to answer only what was asked. The judge in v2 also receives each code's validity period, so part of the faithfulness gain comes from a fairer judge. Raw runs: `evals/results/answers_v1.json`, `answers_v2_run1.json`, `answers.json` (latest); run-to-run variance of the judge score is a few points. Cost uses DeepSeek list prices and ignores cache discounts.
+**v1 → v2** (`agent/prompts.py`): v1 did say "the answer is not in the codes" for out-of-scope questions, then cited the nearest article anyway (tax limitation periods for a question about theft). v2 gives a fixed refusal phrase per language and forbids citations in that case; it also forbids numbers that are not in the article text (v1 added the 2025 MRP value from the model's own memory) and asks to answer only what was asked. The judge in v2 also receives each code's validity period, so part of the faithfulness gain comes from a fairer judge.
 
-**Known limitations.** The remaining faithfulness misses are loose paraphrases of legal conditions: "within seven working days" instead of "after seven working days" (Labour Code art. 56), exemption conditions shortened in a list of VAT exemptions. The next step is to require verbatim quotes for conditions and deadlines. The golden set is small and written by one person; the retrieval fixes above were made after looking at its misses, so the numbers are optimistic for unseen questions.
+**v2 → v3: verbatim quotes.** v2's misses were paraphrases that changed legal meaning ("within seven working days" instead of "after seven working days", Labour Code art. 56). v3 asks for conditions, deadlines and rates as word-for-word quotes in «», and a new graph node, `check_quotes`, verifies every quote of 4+ words against the retrieved articles: one retry, then the quote marks are dropped. In the first v3 run 6 of 48 first drafts had a quote that was not verbatim; all were caught. That run also exposed a bug in the retry itself: 5 answers replied to the internal note ("Исправляю…") and 4 English answers switched to Russian. The notes now say they are internal and repeat the user's question, and the eval checks the answer language and meta text on every run.
 
-Every question of the eval runs is a Langfuse trace (148 so far): the agent node, each LLM call, each tool call and the citation check, with latency.
+What v3 did *not* do: move the judge's faithfulness score. Across five full runs of v2 and v3 it ranged from 84% to 93%, so the judge's noise is larger than the effect. Of the 15 claims the judge rejected in the last run, 14 are outside quotes: lists of rates that drop the article's qualifiers ("6% for agricultural cooperatives" without "except those under subparagraph 1"). Latency is not affected: on the same 12 questions back to back v2 took 8.3 s and v3 6.9 s (median); medians of whole runs moved between 6 and 16 s with the provider's load.
+
+**Known limitations.** Lists of rates and conditions still lose their qualifiers; the next step is to quote list items with their exceptions, or to stop shortening them. One judge run is not enough to compare versions within a few points. The golden set is small and written by one person; the retrieval fixes above were made after looking at its misses, so the numbers are optimistic for unseen questions. Raw runs are in `evals/results/` (`answers_v1.json`, `answers_v2_run1.json`, `answers_v2.json`, `answers.json` = latest v3). Cost uses DeepSeek list prices and ignores cache discounts.
+
+Every question of the eval runs is a Langfuse trace: the agent node, each LLM call, each tool call and both guards, with latency.
 
 <details><summary>Langfuse: traces and calls per tool from the eval runs</summary>
 
@@ -117,7 +124,7 @@ Every question of the eval runs is a Langfuse trace (148 so far): the agent node
 - **Embeddings on a 3 GB laptop.** Embedding 7,374 chunks with e5-small on the laptop CPU ran at ~1 chunk/s because of swapping (~2 hours). The one-off indexing ran on a GPU box instead (`scripts/embed_gpu.py`, RTX 4090: **10.8 s**), and the vectors were loaded with `kzlaw load-vectors`. Queries are embedded on the laptop with the same weights exported to ONNX (no PyTorch in the API image): cosine similarity with the GPU vectors is 1.000000, 15 ms per query.
 - **BM25 in memory, vectors in pgvector.** 7k chunks fit in a few MB and build in about a second; for millions of chunks BM25 would move into the database (ParadeDB `pg_search`) or OpenSearch. pgvector uses HNSW with iterative scans so filters by code and language don't starve the result set.
 - **Kazakh has no Snowball stemmer.** Kazakh words are normalised (ғ/қ, г/к) and cut to a 6-letter prefix: crude but measurable (R@5 kz 0.86 with hybrid + expansion).
-- **Citation guard as a graph node.** Every `[code:article]` in the final answer must be among the articles the tools returned in this run; otherwise the model gets one retry, then the unknown citation is removed. The API never shows an article the model didn't read.
+- **Citation and quote guards as graph nodes.** Every `[code:article]` in the final answer must be among the articles the tools returned in this run, and every «quote» must appear in them word for word (only case, ё/е, dashes and spacing are forgiven). Each guard gives the model one retry; then the unknown citation is removed or the quote marks are dropped. The API never shows an article the model didn't read or a "quote" that isn't one.
 
 ## Run it
 
@@ -174,7 +181,7 @@ Claude Desktop (`claude_desktop_config.json`):
 uv sync                                   # dev + local models
 uv run python evals/run_retrieval.py --no-rerank
 uv run python evals/run_answers.py        # needs an LLM key; ~5 min
-uv run pytest                             # 47 tests; set TEST_DATABASE_URL to a throwaway DB for the pgvector ones
+uv run pytest                             # 62 tests; set TEST_DATABASE_URL to a throwaway DB for the pgvector ones
 uv run ruff check . && uv run mypy        # mypy --strict
 ```
 
@@ -190,4 +197,4 @@ Python 3.12 · LangGraph · LangChain (OpenAI-compatible client: DeepSeek or Cla
 
 ### Кратко по-русски
 
-RAG-ассистент по Налоговому кодексу РК 2026, прежнему Налоговому кодексу (2018–2025) и Трудовому кодексу на русском и казахском. Каждое утверждение в ответе ссылается на статью с прямой ссылкой на adilet.zan.kz. Гибридный поиск (BM25 + pgvector, RRF), агент на LangGraph с проверкой ссылок, MCP-сервер для Claude, трейсинг в Langfuse. На 48 эталонных вопросах агент в 100% случаев ссылается на правильную статью, ключевой факт есть в 100% ответов, на вопросы вне кодексов честно отвечает «ответа нет». Не является юридической консультацией.
+RAG-ассистент по Налоговому кодексу РК 2026, прежнему Налоговому кодексу (2018–2025) и Трудовому кодексу на русском и казахском. Каждое утверждение в ответе ссылается на статью с прямой ссылкой на adilet.zan.kz. Гибридный поиск (BM25 + pgvector, RRF), агент на LangGraph с проверкой ссылок, MCP-сервер для Claude, трейсинг в Langfuse. На 48 эталонных вопросах агент в 100% случаев ссылается на правильную статью, ключевой факт есть в 100% ответов, цитаты закона сверяются с текстом дословно, на вопросы вне кодексов честно отвечает «ответа нет». Не является юридической консультацией.
