@@ -103,6 +103,14 @@ The agent on all 48 questions, `deepseek-flash` through the OpenAI-compatible AP
 
 **Known limitations.** The remaining faithfulness misses are loose paraphrases of legal conditions: "within seven working days" instead of "after seven working days" (Labour Code art. 56), exemption conditions shortened in a list of VAT exemptions. The next step is to require verbatim quotes for conditions and deadlines. The golden set is small and written by one person; the retrieval fixes above were made after looking at its misses, so the numbers are optimistic for unseen questions.
 
+Every question of the eval runs is a Langfuse trace (148 so far): the agent node, each LLM call, each tool call and the citation check, with latency.
+
+<details><summary>Langfuse: traces and calls per tool from the eval runs</summary>
+
+![Langfuse traces](docs/langfuse-traces.png)
+
+</details>
+
 ## Engineering notes
 
 - **Chunking by structure, not by tokens.** Articles are split only on point boundaries (пункты), each chunk carries a header with the code, article number and title, and the point numbers it covers. Editorial notes (Сноска, Примечание ИЗПИ) are dropped, tables flattened to rows.
