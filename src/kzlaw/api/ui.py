@@ -83,7 +83,10 @@ def page(
             body += f"<ul class=meta>{refs}</ul>"
         body += (
             f'<div class="meta">на дату {result.as_of} · инструменты: {html.escape("; ".join(result.tool_calls))}'
-            f"{' · удалены ссылки: ' + ', '.join(result.invalid_citations) if result.invalid_citations else ''}</div>"
+            f"{' · удалены ссылки: ' + ', '.join(result.invalid_citations) if result.invalid_citations else ''}"
+            f"{' · цитат сверено с текстом: ' + str(len(result.quotes)) if result.quotes else ''}"
+            f"{' · не дословно, кавычки сняты: ' + str(len(result.invalid_quotes)) if result.invalid_quotes else ''}"
+            "</div>"
         )
         if disclaimer:
             body += f'<div class="warn">{html.escape(disclaimer)}</div>'

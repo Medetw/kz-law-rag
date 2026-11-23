@@ -110,3 +110,69 @@ def test_chunks_of_one_article_seen_in_two_calls_are_merged(settings: Settings) 
     res = answer_question("Ставка КПН?", settings=settings, retriever=retriever, llm=llm)  # type: ignore[arg-type]
     assert "пункта 2" in res.contexts["tax2026:357"]
     assert "20 процентов" in res.contexts["tax2026:357"]
+
+
+VAT_QUOTE = "«Ставка налога на добавленную стоимость составляет 16 процентов»"
+
+
+def test_verbatim_quote_is_verified(settings: Settings, fake_retriever: FakeRetriever) -> None:
+    llm = ScriptedChatModel(
+        responses=[
+            tool_call("search_law", query="ставка налога на добавленную стоимость"),
+            AIMessage(content=f"По закону: {VAT_QUOTE} [tax2026:503]."),
+        ]
+    )
+    res = answer_question("Ставка НДС?", settings=settings, retriever=fake_retriever, llm=llm)  # type: ignore[arg-type]
+    assert res.quotes == ["Ставка налога на добавленную стоимость составляет 16 процентов"]
+    assert res.invalid_quotes == []
+    assert VAT_QUOTE in res.answer
+
+
+def test_changed_quote_gets_one_retry(settings: Settings, fake_retriever: FakeRetriever) -> None:
+    llm = ScriptedChatModel(
+        responses=[
+            tool_call("search_law", query="ставка налога на добавленную стоимость"),
+            AIMessage(
+                content="По закону: «ставка налога на добавленную стоимость равна шестнадцати процентам» [tax2026:503]."
+            ),
+            AIMessage(content=f"По закону: {VAT_QUOTE} [tax2026:503]."),
+        ]
+    )
+    res = answer_question("Ставка НДС?", settings=settings, retriever=fake_retriever, llm=llm)  # type: ignore[arg-type]
+    retry = llm.seen[-1][-1]
+    assert isinstance(retry, HumanMessage)
+    assert "равна шестнадцати процентам" in str(retry.content)
+    assert "Ставка НДС?" in str(retry.content)  # the original question is repeated to keep its language
+    assert "не упоминай" in str(retry.content)
+    assert res.invalid_quotes == []
+    assert len(res.quotes) == 1
+
+
+def test_quote_still_wrong_after_retry_is_unquoted(settings: Settings, fake_retriever: FakeRetriever) -> None:
+    wrong = "ставка налога на добавленную стоимость равна шестнадцати процентам"
+    llm = ScriptedChatModel(
+        responses=[
+            tool_call("search_law", query="ставка налога на добавленную стоимость"),
+            AIMessage(content=f"По закону: «{wrong}» [tax2026:503]."),
+            AIMessage(content=f"По закону: «{wrong}» [tax2026:503]."),
+        ]
+    )
+    res = answer_question("Ставка НДС?", settings=settings, retriever=fake_retriever, llm=llm)  # type: ignore[arg-type]
+    assert res.invalid_quotes == [wrong]
+    assert f"«{wrong}»" not in res.answer
+    assert wrong in res.answer
+    assert [c.cite_id for c in res.citations] == ["tax2026:503"]  # the citation itself is still valid
+
+
+def test_refusals_are_not_quote_checked(settings: Settings, fake_retriever: FakeRetriever) -> None:
+    llm = ScriptedChatModel(
+        responses=[
+            tool_call("search_law", query="гражданство"),
+            AIMessage(
+                content="В Налоговом и Трудовом кодексах ответа нет: это Закон «О гражданстве Республики Казахстан»."
+            ),
+        ]
+    )
+    res = answer_question("Как получить гражданство?", settings=settings, retriever=fake_retriever, llm=llm)  # type: ignore[arg-type]
+    assert res.invalid_quotes == []
+    assert "«О гражданстве Республики Казахстан»" in res.answer

@@ -2,13 +2,16 @@
 
     START -> agent --(tool calls)--> tools -> agent ...
                    \\--(final text)--> check_citations --(invalid ids, 1st time)--> agent
-                                                     \\--(ok)--> END
+                                                     \\--(ok)--> check_quotes --(not verbatim, 1st time)--> agent
+                                                                                \\--(ok)--> END
 
 * ``agent``: the chat model with three tools bound (search_law, get_article, compare_editions).
 * ``tools``: runs the calls; every returned article is stored in ``state.sources`` by its citation id.
 * ``check_citations``: every ``[code:article]`` in the answer must be in ``state.sources``. If not, the model
   gets one chance to fix it; after that invalid citations are removed, so the API never shows an article
   the model did not actually read.
+* ``check_quotes``: every «quote» of 4+ words must appear word for word in a retrieved article (conditions and
+  deadlines are quoted, see prompts.py). One retry; then the quote marks are dropped and the quote is reported.
 """
 
 from __future__ import annotations
@@ -26,9 +29,9 @@ from langgraph.graph.message import add_messages
 from pydantic import BaseModel, Field
 
 from kzlaw import tools as T
-from kzlaw.agent import citations
+from kzlaw.agent import citations, quotes
 from kzlaw.agent.llm import get_chat_model
-from kzlaw.agent.prompts import CITATION_RETRY, system_prompt
+from kzlaw.agent.prompts import CITATION_RETRY, QUOTE_RETRY, system_prompt
 from kzlaw.config import Settings, get_settings
 from kzlaw.corpus import CODES
 from kzlaw.search.hybrid import Retriever, get_retriever
@@ -36,6 +39,7 @@ from kzlaw.tracing import flush, trace
 
 MAX_TOOL_ROUNDS = 4
 MAX_CITATION_RETRIES = 1
+MAX_QUOTE_RETRIES = 1
 
 
 def _merge_source(old: T.Source, new: T.Source) -> T.Source:
@@ -61,9 +65,12 @@ class AgentState(TypedDict):
     sources: Annotated[dict[str, T.Source], _merge]
     tool_rounds: Annotated[int, operator.add]
     retries: Annotated[int, operator.add]
+    quote_retries: Annotated[int, operator.add]
     answer: str
     cited: list[str]
     invalid: list[str]
+    quotes_ok: list[str]
+    quotes_bad: list[str]
 
 
 class SearchArgs(BaseModel):
@@ -131,6 +138,11 @@ def make_tools(retriever: Retriever, default_as_of: str) -> list[BaseTool]:
     ]
 
 
+def _question(state: AgentState) -> str:
+    """The user's original question, repeated in retry notes so the rewrite keeps its language."""
+    return str(state["messages"][0].content)
+
+
 def build_graph(llm: BaseChatModel, retriever: Retriever, as_of: str) -> Any:
     tools = make_tools(retriever, as_of)
     by_name = {t.name: t for t in tools}
@@ -167,12 +179,24 @@ def build_graph(llm: BaseChatModel, retriever: Retriever, as_of: str) -> Any:
         cited = citations.extract(text)
         bad = [c for c in cited if c not in state["sources"]]
         if bad and state["retries"] < MAX_CITATION_RETRIES:
-            return {"messages": [HumanMessage(CITATION_RETRY.format(bad=", ".join(bad)))], "retries": 1}
+            note = CITATION_RETRY.format(bad=", ".join(bad), question=_question(state))
+            return {"messages": [HumanMessage(note)], "retries": 1}
         return {
             "answer": citations.strip(text, set(bad)),
             "cited": [c for c in cited if c not in bad],
             "invalid": bad,
         }
+
+    def check_quotes(state: AgentState) -> dict[str, Any]:
+        text = state["answer"]
+        if not state["cited"]:  # refusals and answers without sources: nothing to check quotes against
+            return {"quotes_ok": [], "quotes_bad": []}
+        res = quotes.check(text, [f"{s.title}\n{s.text}" for s in state["sources"].values()])
+        if res.invalid and state["quote_retries"] < MAX_QUOTE_RETRIES:
+            bad = "; ".join(f"«{q}»" for q in res.invalid)
+            note = QUOTE_RETRY.format(bad=bad, question=_question(state))
+            return {"messages": [HumanMessage(note)], "quote_retries": 1, "answer": ""}
+        return {"answer": quotes.unquote(text, res.invalid), "quotes_ok": res.verified, "quotes_bad": res.invalid}
 
     def after_agent(state: AgentState) -> str:
         last = state["messages"][-1]
@@ -182,10 +206,14 @@ def build_graph(llm: BaseChatModel, retriever: Retriever, as_of: str) -> Any:
     g.add_node("agent", agent)
     g.add_node("tools", run_tools)
     g.add_node("check_citations", check_citations)
+    g.add_node("check_quotes", check_quotes)
     g.add_edge(START, "agent")
     g.add_conditional_edges("agent", after_agent, ["tools", "check_citations"])
     g.add_edge("tools", "agent")
-    g.add_conditional_edges("check_citations", lambda s: END if s["answer"] else "agent", ["agent", END])
+    g.add_conditional_edges(
+        "check_citations", lambda s: "check_quotes" if s["answer"] else "agent", ["agent", "check_quotes"]
+    )
+    g.add_conditional_edges("check_quotes", lambda s: END if s["answer"] else "agent", ["agent", END])
     return g.compile()
 
 
@@ -202,6 +230,8 @@ class AnswerResult(BaseModel):
     answer: str
     citations: list[Citation]
     invalid_citations: list[str]
+    quotes: list[str] = Field(default_factory=list)  # «quotes» verified word for word against the articles
+    invalid_quotes: list[str] = Field(default_factory=list)  # not verbatim after one retry: shown unquoted
     retrieved: list[str]  # every article the tools returned, in order
     contexts: dict[str, str]  # cite_id -> text the model saw (used by the faithfulness eval)
     tool_calls: list[str]
@@ -228,9 +258,12 @@ def answer_question(
                 "sources": {},
                 "tool_rounds": 0,
                 "retries": 0,
+                "quote_retries": 0,
                 "answer": "",
                 "cited": [],
                 "invalid": [],
+                "quotes_ok": [],
+                "quotes_bad": [],
             },
             config={"callbacks": ctx.callbacks, "recursion_limit": 25, "run_name": "kz-law-agent"},
         )
@@ -245,6 +278,8 @@ def answer_question(
                 for c in state["cited"]
             ],
             invalid_citations=state["invalid"],
+            quotes=state["quotes_ok"],
+            invalid_quotes=state["quotes_bad"],
             retrieved=list(sources),
             contexts={c: s.text for c, s in sources.items()},
             tool_calls=[
@@ -260,6 +295,11 @@ def answer_question(
             trace_id=ctx.trace_id,
         )
         ctx.output = {"answer": result.answer, "citations": state["cited"], "invalid": state["invalid"]}
-        ctx.metadata = {"retrieved": result.retrieved, "invalid_citations": state["invalid"]}
+        ctx.metadata = {
+            "retrieved": result.retrieved,
+            "invalid_citations": state["invalid"],
+            "quotes": len(state["quotes_ok"]),
+            "invalid_quotes": state["quotes_bad"],
+        }
     flush(settings)
     return result
